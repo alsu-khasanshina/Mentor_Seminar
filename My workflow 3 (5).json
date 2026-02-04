@@ -1,0 +1,238 @@
+{
+  "name": "My workflow 3",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -384,
+        0
+      ],
+      "id": "72bad549-5b43-418a-b9a1-c1ae2bfb8a22",
+      "name": "Telegram Trigger",
+      "webhookId": "31a99515-39cc-4f26-bb47-22899b97f8da",
+      "alwaysOutputData": true,
+      "notesInFlow": false,
+      "credentials": {
+        "telegramApi": {
+          "id": "2WfAXyTEaMRKk9a3",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const movie = $json.movie; // результат JavaScript8\n\nconst message = `🎬 ${movie.title} (${movie.year})\n\n⭐ Рейтинг: ${movie.rating}/10\n🎭 Жанр: ${movie.genres}`;\n\nreturn {\n  chatId: $json.chatId,\n  message: message\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1824,
+        0
+      ],
+      "id": "bca754b9-b7e7-438b-aef4-6b9b11b51cbc",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "url": "https://api.kinopoisk.dev/v1.4/movie",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "token",
+              "value": "NKZVJ8H-QWVMD81-P4F6ZVK-NYVXYTY"
+            },
+            {
+              "name": "=genres.name",
+              "value": "={{ $json.genre }}"
+            },
+            {
+              "name": "type",
+              "value": "movie"
+            },
+            {
+              "name": "limit",
+              "value": "200"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1088,
+        -32
+      ],
+      "id": "8f3e3ed3-8c1d-457d-b774-5dad287e0675",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "chatId": "=771326164",
+        "text": "={{ $json.message }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2672,
+        -112
+      ],
+      "id": "eb57c0fd-8e13-4130-86f5-da41523207f2",
+      "name": "Send a text message",
+      "webhookId": "21b02e55-aaea-4b58-8abe-ff95088e1a48",
+      "credentials": {
+        "telegramApi": {
+          "id": "2WfAXyTEaMRKk9a3",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ПОЛНАЯ ОТЛАДКА\nconst inputData = $input.first().json;\n\nconsole.log(\"=== TELEGRAM DATA ===\");\nconsole.log(JSON.stringify(inputData, null, 2));\n\n// Вариант 1: Обычное сообщение\nif (inputData.message) {\n  const msg = inputData.message;\n  console.log(\"Got message:\", msg.text);\n  \n  return {\n    chatId: msg.chat.id,\n    userId: msg.from.id,\n    text: msg.text || '',\n    firstName: msg.from.first_name || 'User',\n    isCommand: msg.text && msg.text.startsWith('/'),\n    // Для workflow\n    originalInput: msg.text || '',\n    genre: (msg.text || '').toLowerCase(),\n    command: 'search'\n  };\n}\n\n// Вариант 2: Callback от кнопки\nif (inputData.callback_query) {\n  console.log(\"Got callback:\", inputData.callback_query.data);\n  return {\n    chatId: inputData.callback_query.message.chat.id,\n    text: inputData.callback_query.data,\n    command: 'callback'\n  };\n}\n\n// Если ничего не распознали\nconsole.log(\"Unknown data format\");\nreturn {\n  error: \"Unknown format\",\n  raw: inputData\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "60456226-588c-42cf-b561-19b05cdb7881",
+      "name": "Code in JavaScript5",
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "chatId": "771326164",
+        "text": "=✅ Бот получил ваше сообщение!  Вы написали: \"{{ $json.text }}\" Chat ID: {{ $json.chatId }}  Сейчас поищу фильмы...",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        -96
+      ],
+      "id": "3314051d-5c5d-456b-9eb3-ef8679a79f59",
+      "name": "Send a text message2",
+      "webhookId": "2419c6d3-57c6-4fce-9567-fa772d760785",
+      "alwaysOutputData": true,
+      "credentials": {
+        "telegramApi": {
+          "id": "2WfAXyTEaMRKk9a3",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Получаем ответ API\nconst apiResponse = $input.first().json;\nconst userData = $input.first().json;\n\n// Жанр пользователя\nconst requestedGenre = (userData.genre || '').toLowerCase().trim();\n\n// Проверка наличия фильмов\nif (!apiResponse.docs || apiResponse.docs.length === 0) {\n  return { movieFound: false };\n}\n\n// Фильтр по жанру\nlet moviesByGenre = [];\nfor (let i = 0; i < apiResponse.docs.length; i++) {\n  const movie = apiResponse.docs[i];\n  if (!movie.name || !movie.genres) continue;\n\n  for (let j = 0; j < movie.genres.length; j++) {\n    const g = movie.genres[j];\n    if (g.name && g.name.toLowerCase() === requestedGenre) {\n      moviesByGenre.push(movie);\n      break;\n    }\n  }\n}\n\n//  Фallback: если по жанру нет — берём все фильмы\nif (moviesByGenre.length === 0) {\n  for (let i = 0; i < apiResponse.docs.length; i++) {\n    const movie = apiResponse.docs[i];\n    if (movie.name) moviesByGenre.push(movie);\n  }\n}\n\n// 3️⃣ Сортировка по рейтингу\nmoviesByGenre.sort(function(a, b) {\n  let ra = 0;\n  let rb = 0;\n  if (a.rating && a.rating.kp) ra = a.rating.kp;\n  else if (a.rating && a.rating.imdb) ra = a.rating.imdb;\n\n  if (b.rating && b.rating.kp) rb = b.rating.kp;\n  else if (b.rating && b.rating.imdb) rb = b.rating.imdb;\n\n  return rb - ra;\n});\n\n// Берём первый фильм\nconst selectedMovie = moviesByGenre[0];\n\n//  Если нет фильма\nif (!selectedMovie) return { movieFound: false };\n\n// 6️⃣ Формируем ответ\nlet genreNames = '';\nif (selectedMovie.genres) {\n  let arr = [];\n  for (let i = 0; i < selectedMovie.genres.length; i++) {\n    if (selectedMovie.genres[i].name) arr.push(selectedMovie.genres[i].name);\n  }\n  genreNames = arr.join(', ') || 'Не указаны';\n}\n\nreturn {\n  ...userData,\n  movieFound: true,\n  movie: {\n    title: selectedMovie.name,\n    description: selectedMovie.description || 'Интересный фильм.',\n    rating: selectedMovie.rating && selectedMovie.rating.kp\n      ? selectedMovie.rating.kp.toFixed(1)\n      : selectedMovie.rating && selectedMovie.rating.imdb\n        ? selectedMovie.rating.imdb.toFixed(1)\n        : '7.0',\n    year: selectedMovie.year || '?',\n    genres: genreNames\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1456,
+        0
+      ],
+      "id": "7fece677-aea0-4b86-bf02-0bf7732e471c",
+      "name": "Code in JavaScript8"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript5": {
+      "main": [
+        [
+          {
+            "node": "Send a text message2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a text message2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a text message2": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript8": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "9d144b90-24dd-40a9-8621-ad9736ebc92f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "6c9dccbec564fe1c19d0372b7b5246b7f5e1b75f8b966f8d26d6a71feae16e5f"
+  },
+  "id": "lFhSJbU0GCgKcwbW",
+  "tags": []
+}
